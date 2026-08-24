@@ -12,6 +12,7 @@
 - 本地缓存，按日期幂等更新
 - 自动清理旧壁纸
 - 注册每日计划任务和当前用户登录自启
+- 支持 `setup` 命令完成“立即更新 + 自动配置”
 - 独立 worker 二进制，无控制台窗口
 
 ## 构建
@@ -39,8 +40,8 @@ target\release\bing-wallpaper-worker.exe
 # 安装每日任务和登录自启，每天 09:30 运行
 .\bing-wallpaper.exe install --time 09:30
 
-# 安装时指定画质和壁纸模式
-.\bing-wallpaper.exe install --time 09:30 --resolution 1080 --style fill
+# 立即更新并安装每日任务和登录自启
+.\bing-wallpaper.exe setup --time 09:30 --resolution 1080 --style fill
 
 # 查看缓存和任务状态
 .\bing-wallpaper.exe status
@@ -70,6 +71,7 @@ bing-wallpaper.exe [COMMAND]
 | --- | --- |
 | `run` | 立即更新壁纸 |
 | `install` | 注册每日计划任务和登录自启 |
+| `setup` | 立即更新，然后注册每日计划任务和登录自启 |
 | `uninstall` | 卸载每日计划任务和登录自启 |
 | `status` | 查看缓存和计划任务状态 |
 | `help` | 打印指定命令的帮助 |
@@ -105,6 +107,24 @@ bing-wallpaper.exe run [OPTIONS]
 
 ```text
 bing-wallpaper.exe install [OPTIONS]
+```
+
+| 参数 | 类型 | 默认值 | 可选值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `--mkt <MKT>` | 字符串 | `zh-CN` | 任意 Bing market | 必应地区，例如 `zh-CN`、`en-US` |
+| `--host <HOST>` | 字符串 | `https://www.bing.com` | URL | 必应接口主机 |
+| `--resolution <RESOLUTION>` | 枚举 | `1080` | `1080`、`uhd` | 首选图片质量 |
+| `--style <STYLE>` | 枚举 | `fill` | `fill`、`fit`、`stretch`、`center`、`span`、`tile` | Windows 壁纸放置模式 |
+| `--keep <KEEP>` | 整数 | `14` | 正整数 | 保留最近多少张缓存图 |
+| `--time <TIME>` | 字符串 | `09:30` | `HH:MM`，24 小时制 | 每日计划任务运行时间 |
+| `-h, --help` | 开关 | 无 | 无 | 显示当前命令帮助 |
+
+### `setup`
+
+立即更新壁纸，然后注册每日计划任务和登录自启。
+
+```text
+bing-wallpaper.exe setup [OPTIONS]
 ```
 
 | 参数 | 类型 | 默认值 | 可选值 | 说明 |

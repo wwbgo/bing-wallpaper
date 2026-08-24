@@ -27,6 +27,9 @@ fn main() -> anyhow::Result<()> {
         Cli::Install(args) => {
             bing_wallpaper::scheduler::install(&args.wallpaper, &args.time)?;
         }
+        Cli::Setup(args) => {
+            bing_wallpaper::setup(&args)?;
+        }
         Cli::Uninstall => {
             bing_wallpaper::scheduler::uninstall()?;
         }

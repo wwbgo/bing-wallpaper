@@ -15,7 +15,7 @@ use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex};
 use windows::core::PCWSTR;
 
-use crate::cli::RunArgs;
+use crate::cli::{RunArgs, SetupArgs};
 use crate::state::AppState;
 
 pub struct AppDirs {
@@ -125,6 +125,35 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         image_path,
         copyright: image.copyright,
     })
+}
+
+pub fn setup(args: &SetupArgs) -> Result<()> {
+    let run = RunArgs {
+        wallpaper: args.wallpaper.clone(),
+        force: false,
+        dry_run: false,
+    };
+
+    match run_once(&run) {
+        Ok(outcome) => {
+            if outcome.changed {
+                println!(
+                    "wallpaper updated: startdate={} image={} copyright={}",
+                    outcome.startdate,
+                    outcome.image_path.display(),
+                    outcome.copyright
+                );
+            } else {
+                println!("wallpaper is already current: {}", outcome.startdate);
+            }
+        }
+        Err(error) => {
+            eprintln!("warning: failed to update wallpaper now: {error:#}");
+            let _ = append_log(&format!("setup update failed, continuing: {error:#}"));
+        }
+    }
+
+    scheduler::install(&args.wallpaper, &args.time)
 }
 
 pub fn run_worker_from_env() -> Result<()> {

@@ -65,6 +65,16 @@ pub struct InstallArgs {
     pub time: String,
 }
 
+#[derive(Clone, Debug, Args)]
+pub struct SetupArgs {
+    #[command(flatten)]
+    pub wallpaper: WallpaperOptions,
+
+    /// Local time when the daily scheduled task runs.
+    #[arg(long, default_value = "09:30")]
+    pub time: String,
+}
+
 #[derive(Debug, Parser)]
 #[command(
     name = "bing-wallpaper",
@@ -76,6 +86,9 @@ pub enum Cli {
 
     /// Register daily and logon scheduled tasks.
     Install(InstallArgs),
+
+    /// Update now, then register daily and logon startup.
+    Setup(SetupArgs),
 
     /// Remove scheduled tasks.
     Uninstall,
