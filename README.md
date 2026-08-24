@@ -13,6 +13,7 @@
 - 自动清理旧壁纸
 - 注册每日计划任务和当前用户登录自启
 - 支持 `setup` 命令完成“立即更新 + 自动配置”
+- 提供 Windows x64 安装包
 - 独立 worker 二进制，无控制台窗口
 
 ## 构建
@@ -27,6 +28,29 @@ cargo build --release --bins
 target\release\bing-wallpaper.exe
 target\release\bing-wallpaper-worker.exe
 ```
+
+## 安装包
+
+GitHub Release 会提供：
+
+```text
+BingWallpaperSetup-<version>.exe
+bing-wallpaper-windows-x64-<version>.zip
+```
+
+安装包会安装到当前用户目录：
+
+```text
+%LOCALAPPDATA%\Programs\Bing Wallpaper
+```
+
+安装完成后会自动执行：
+
+```text
+setup --time 09:30 --resolution 1080 --style fill
+```
+
+即立即更新一次壁纸，并注册每日计划任务和登录自启。
 
 ## 使用
 
