@@ -273,4 +273,20 @@ mod tests {
         );
         assert_eq!(quote_arg("simple"), "simple");
     }
+
+    #[test]
+    fn worker_command_preserves_auto_resolution() {
+        let wallpaper = WallpaperOptions {
+            mkt: "zh-CN".to_string(),
+            host: "https://www.bing.com".to_string(),
+            resolution: crate::cli::Resolution::Auto,
+            style: crate::cli::WallpaperStyle::Fill,
+            keep: 14,
+        };
+
+        let command = worker_command(Path::new("C:\\worker.exe"), &wallpaper);
+
+        assert!(command.contains("--resolution auto"));
+        assert!(command.contains("--style fill"));
+    }
 }

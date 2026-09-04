@@ -106,7 +106,8 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         });
     }
 
-    if !image_path.is_file() || state.last_resolution.as_deref() != Some(resolution_name) {
+    let resolution_matches = state.last_resolution.as_deref() == Some(resolution_name);
+    if should_download_image(args.force, image_path.is_file(), resolution_matches) {
         bing::download_image(&wallpaper.host, &image, resolution, &image_path)?;
     }
 
@@ -145,6 +146,10 @@ fn resolution_name(resolution: Resolution) -> &'static str {
         Resolution::Fhd => "1080",
         Resolution::Uhd => "uhd",
     }
+}
+
+fn should_download_image(force: bool, image_exists: bool, resolution_matches: bool) -> bool {
+    force || !image_exists || !resolution_matches
 }
 
 pub fn setup(args: &SetupArgs) -> Result<()> {
@@ -343,4 +348,25 @@ fn local_timestamp() -> String {
 fn local_now() -> OffsetDateTime {
     OffsetDateTime::now_local()
         .unwrap_or_else(|_| OffsetDateTime::now_utc().to_offset(UtcOffset::UTC))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn force_downloads_cached_image_even_when_resolution_matches() {
+        assert!(should_download_image(true, true, true));
+    }
+
+    #[test]
+    fn normal_run_uses_cached_image_when_resolution_matches() {
+        assert!(!should_download_image(false, true, true));
+    }
+
+    #[test]
+    fn normal_run_downloads_when_image_is_missing_or_resolution_differs() {
+        assert!(should_download_image(false, false, true));
+        assert!(should_download_image(false, true, false));
+    }
 }
