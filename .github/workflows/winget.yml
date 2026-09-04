@@ -1,0 +1,103 @@
+name: Publish WinGet Manifest
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to publish
+        required: true
+        default: 0.2.0
+
+permissions:
+  contents: read
+
+jobs:
+  manifest:
+    name: Generate and submit WinGet manifest
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          } else {
+            $version = "${{ github.event.release.tag_name }}" -replace '^v', ''
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+
+      - name: Download installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $pattern = "BingWallpaperSetup-$version.exe"
+          gh release download "v$version" --repo "${{ github.repository }}" --pattern "$pattern" --dir dist
+
+      - name: Hash installer
+        id: hash
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $file = "dist/BingWallpaperSetup-$version.exe"
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          $url = "https://github.com/${{ github.repository }}/releases/download/v$version/BingWallpaperSetup-$version.exe"
+          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+          "installer_url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+
+      - name: Generate manifests
+        shell: pwsh
+        run: |
+          ./scripts/generate-winget-manifest.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -InstallerUrl "${{ steps.hash.outputs.installer_url }}" `
+            -InstallerSha256 "${{ steps.hash.outputs.sha256 }}" `
+            -OutputRoot "dist/winget"
+
+      - name: Validate manifests
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $manifestDir = "dist/winget/manifests/w/wwb/BingWallpaper/$version"
+          winget validate --manifest "$manifestDir"
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: winget-manifest-${{ steps.version.outputs.version }}
+          path: dist/winget/manifests/**
+          if-no-files-found: error
+
+      - name: Submit manifest
+        if: env.WINGET_TOKEN != ''
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $manifest = "dist/winget/manifests/w/wwb/BingWallpaper/$version/wwb.BingWallpaper.yaml"
+
+          winget install --id Microsoft.WingetCreate -e `
+            --silent `
+            --accept-package-agreements `
+            --accept-source-agreements
+
+          $wingetCreate = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links\wingetcreate.exe"
+          if (-not (Test-Path $wingetCreate)) {
+            $wingetCreate = "wingetcreate"
+          }
+
+          & $wingetCreate submit `
+            --prtitle "New package: wwb.BingWallpaper version $version" `
+            --token $env:WINGET_TOKEN `
+            --no-open `
+            $manifest

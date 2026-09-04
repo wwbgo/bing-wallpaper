@@ -54,6 +54,16 @@ setup --time 09:30 --resolution auto --style fill
 
 即立即更新一次壁纸，并注册每日计划任务和登录自启。
 
+## WinGet
+
+首次清单合入 `microsoft/winget-pkgs` 后，可以使用：
+
+```powershell
+winget install wwb.BingWallpaper
+```
+
+提交和自动发布说明见 [docs/winget.md](docs/winget.md)。
+
 ## 使用
 
 ```powershell
