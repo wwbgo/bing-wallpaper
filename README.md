@@ -7,7 +7,8 @@
 ## 功能
 
 - 从必应官方公开接口获取每日壁纸
-- 支持 `1080` 和 `uhd` 两种画质
+- 支持 `auto`、`1080` 和 `uhd` 三种画质
+- `auto` 会枚举显示器，在任一显示器达到 2560x1440 或以上时使用 `uhd`
 - 支持填充、适应、拉伸、居中、平铺、跨屏
 - 本地缓存，按日期幂等更新
 - 自动清理旧壁纸
@@ -15,6 +16,7 @@
 - 支持 `setup` 命令完成“立即更新 + 自动配置”
 - 提供 Windows x64 安装包
 - 独立 worker 二进制，无控制台窗口
+- 当前只下载静态图片，不处理视频或动态壁纸
 
 ## 构建
 
@@ -47,7 +49,7 @@ bing-wallpaper-windows-x64-<version>.zip
 安装完成后会自动执行：
 
 ```text
-setup --time 09:30 --resolution 1080 --style fill
+setup --time 09:30 --resolution auto --style fill
 ```
 
 即立即更新一次壁纸，并注册每日计划任务和登录自启。
@@ -65,7 +67,7 @@ setup --time 09:30 --resolution 1080 --style fill
 .\bing-wallpaper.exe install --time 09:30
 
 # 立即更新并安装每日任务和登录自启
-.\bing-wallpaper.exe setup --time 09:30 --resolution 1080 --style fill
+.\bing-wallpaper.exe setup --time 09:30 --resolution auto --style fill
 
 # 查看缓存和任务状态
 .\bing-wallpaper.exe status
@@ -118,7 +120,7 @@ bing-wallpaper.exe run [OPTIONS]
 | --- | --- | --- | --- | --- |
 | `--mkt <MKT>` | 字符串 | `zh-CN` | 任意 Bing market | 必应地区，例如 `zh-CN`、`en-US` |
 | `--host <HOST>` | 字符串 | `https://www.bing.com` | URL | 必应接口主机 |
-| `--resolution <RESOLUTION>` | 枚举 | `1080` | `1080`、`uhd` | 首选图片质量 |
+| `--resolution <RESOLUTION>` | 枚举 | `auto` | `auto`、`1080`、`uhd` | 首选图片质量；`auto` 根据显示器分辨率选择 |
 | `--style <STYLE>` | 枚举 | `fill` | `fill`、`fit`、`stretch`、`center`、`span`、`tile` | Windows 壁纸放置模式 |
 | `--keep <KEEP>` | 整数 | `14` | 正整数 | 保留最近多少张缓存图 |
 | `--force` | 开关 | 关闭 | 无 | 即使当天图片已缓存也强制更新 |
@@ -137,7 +139,7 @@ bing-wallpaper.exe install [OPTIONS]
 | --- | --- | --- | --- | --- |
 | `--mkt <MKT>` | 字符串 | `zh-CN` | 任意 Bing market | 必应地区，例如 `zh-CN`、`en-US` |
 | `--host <HOST>` | 字符串 | `https://www.bing.com` | URL | 必应接口主机 |
-| `--resolution <RESOLUTION>` | 枚举 | `1080` | `1080`、`uhd` | 首选图片质量 |
+| `--resolution <RESOLUTION>` | 枚举 | `auto` | `auto`、`1080`、`uhd` | 首选图片质量；`auto` 根据显示器分辨率选择 |
 | `--style <STYLE>` | 枚举 | `fill` | `fill`、`fit`、`stretch`、`center`、`span`、`tile` | Windows 壁纸放置模式 |
 | `--keep <KEEP>` | 整数 | `14` | 正整数 | 保留最近多少张缓存图 |
 | `--time <TIME>` | 字符串 | `09:30` | `HH:MM`，24 小时制 | 每日计划任务运行时间 |
@@ -155,7 +157,7 @@ bing-wallpaper.exe setup [OPTIONS]
 | --- | --- | --- | --- | --- |
 | `--mkt <MKT>` | 字符串 | `zh-CN` | 任意 Bing market | 必应地区，例如 `zh-CN`、`en-US` |
 | `--host <HOST>` | 字符串 | `https://www.bing.com` | URL | 必应接口主机 |
-| `--resolution <RESOLUTION>` | 枚举 | `1080` | `1080`、`uhd` | 首选图片质量 |
+| `--resolution <RESOLUTION>` | 枚举 | `auto` | `auto`、`1080`、`uhd` | 首选图片质量；`auto` 根据显示器分辨率选择 |
 | `--style <STYLE>` | 枚举 | `fill` | `fill`、`fit`、`stretch`、`center`、`span`、`tile` | Windows 壁纸放置模式 |
 | `--keep <KEEP>` | 整数 | `14` | 正整数 | 保留最近多少张缓存图 |
 | `--time <TIME>` | 字符串 | `09:30` | `HH:MM`，24 小时制 | 每日计划任务运行时间 |

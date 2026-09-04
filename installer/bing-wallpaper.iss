@@ -26,7 +26,7 @@ Source: "..\target\release\bing-wallpaper-worker.exe"; DestDir: "{app}"; Flags: 
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Run]
-Filename: "{app}\bing-wallpaper.exe"; Parameters: "setup --time 09:30 --resolution 1080 --style fill"; Description: "立即更新并配置每日必应壁纸"; Flags: runhidden waituntilterminated
+Filename: "{app}\bing-wallpaper.exe"; Parameters: "setup --time 09:30 --resolution auto --style fill"; Description: "立即更新并配置每日必应壁纸"; Flags: runhidden waituntilterminated
 
 [UninstallRun]
 Filename: "{app}\bing-wallpaper.exe"; Parameters: "uninstall"; Flags: runhidden
