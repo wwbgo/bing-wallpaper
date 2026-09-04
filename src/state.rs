@@ -18,6 +18,8 @@ pub struct AppState {
     pub updated_at: String,
     #[serde(default)]
     pub last_local_run_date: String,
+    #[serde(default)]
+    pub last_resolution: Option<String>,
 }
 
 impl AppState {
@@ -75,4 +77,19 @@ fn wide_path(path: &Path) -> Vec<u16> {
         .encode_wide()
         .chain(iter::once(0))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_state_without_last_resolution_deserializes() {
+        let state: AppState = serde_json::from_str(
+            r#"{"last_startdate":"20260903","last_image":"C:/img.jpg","copyright":"test","updated_at":"2026-09-03 09:00:00","last_local_run_date":"20260903"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(state.last_resolution, None);
+    }
 }

@@ -16,7 +16,7 @@ use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex};
 use windows::core::PCWSTR;
 
-use crate::cli::{RunArgs, SetupArgs};
+use crate::cli::{Resolution, RunArgs, SetupArgs};
 use crate::state::AppState;
 
 pub struct AppDirs {
@@ -76,11 +76,15 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
 
     let state = load_state(&dirs.state_file).unwrap_or_default();
     let today = local_date_string();
+    let wallpaper = &args.wallpaper;
+    let resolution = effective_resolution(wallpaper.resolution)?;
+    let resolution_name = resolution_name(resolution);
 
     if !args.force
         && !args.dry_run
         && state.last_local_run_date == today
         && Path::new(&state.last_image).is_file()
+        && state.last_resolution.as_deref() == Some(resolution_name)
     {
         return Ok(RunOutcome {
             changed: false,
@@ -90,7 +94,6 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         });
     }
 
-    let wallpaper = &args.wallpaper;
     let image = bing::fetch_today(&wallpaper.host, &wallpaper.mkt)?;
     let image_path = dirs.images.join(format!("{}.jpg", image.startdate));
 
@@ -103,8 +106,8 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         });
     }
 
-    if !image_path.is_file() {
-        bing::download_image(&wallpaper.host, &image, wallpaper.resolution, &image_path)?;
+    if !image_path.is_file() || state.last_resolution.as_deref() != Some(resolution_name) {
+        bing::download_image(&wallpaper.host, &image, resolution, &image_path)?;
     }
 
     wallpaper::set_wallpaper(&image_path, wallpaper.style)?;
@@ -115,6 +118,7 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         copyright: image.copyright.clone(),
         updated_at: local_timestamp(),
         last_local_run_date: today,
+        last_resolution: Some(resolution_name.to_string()),
     };
     new_state.save(&dirs.state_file)?;
 
@@ -126,6 +130,21 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         image_path,
         copyright: image.copyright,
     })
+}
+
+fn effective_resolution(resolution: Resolution) -> Result<Resolution> {
+    match resolution {
+        Resolution::Auto => display::auto_resolution(),
+        explicit => Ok(explicit),
+    }
+}
+
+fn resolution_name(resolution: Resolution) -> &'static str {
+    match resolution {
+        Resolution::Auto => "auto",
+        Resolution::Fhd => "1080",
+        Resolution::Uhd => "uhd",
+    }
 }
 
 pub fn setup(args: &SetupArgs) -> Result<()> {
@@ -198,6 +217,10 @@ pub fn status() -> Result<()> {
             println!("local_run_date: {}", state.last_local_run_date);
             println!("image: {}", state.last_image.display());
             println!("copyright: {}", state.copyright);
+            println!(
+                "resolution: {}",
+                state.last_resolution.as_deref().unwrap_or("unknown")
+            );
             println!("updated_at: {}", state.updated_at);
         }
         Ok(None) => println!("\n[state]\nnot created yet"),
