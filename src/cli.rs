@@ -1,7 +1,9 @@
 use clap::{Args, Parser, ValueEnum};
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum Resolution {
+    #[value(name = "auto")]
+    Auto,
     #[value(name = "1080", alias = "fhd")]
     Fhd,
     #[value(name = "uhd", alias = "4k")]
@@ -29,7 +31,7 @@ pub struct WallpaperOptions {
     pub host: String,
 
     /// Preferred image quality.
-    #[arg(long, value_enum, default_value = "1080")]
+    #[arg(long, value_enum, default_value = "auto")]
     pub resolution: Resolution,
 
     /// Windows wallpaper placement mode.

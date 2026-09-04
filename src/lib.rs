@@ -1,5 +1,6 @@
 pub mod bing;
 pub mod cli;
+pub mod display;
 pub mod scheduler;
 pub mod state;
 pub mod wallpaper;

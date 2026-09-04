@@ -133,7 +133,7 @@ fn candidate_image_urls(host: &str, image: &BingImage, resolution: Resolution) -
             format!("{host}{base}_UHD.jpg"),
             format!("{host}{base}_1920x1080.jpg"),
         ],
-        Resolution::Fhd => vec![
+        Resolution::Auto | Resolution::Fhd => vec![
             format!("{host}{base}_1920x1080.jpg"),
             format!("{host}{base}_UHD.jpg"),
         ],

@@ -160,6 +160,7 @@ fn worker_command(worker: &Path, wallpaper: &WallpaperOptions) -> String {
 
 fn resolution_name(resolution: crate::cli::Resolution) -> &'static str {
     match resolution {
+        crate::cli::Resolution::Auto => "auto",
         crate::cli::Resolution::Fhd => "1080",
         crate::cli::Resolution::Uhd => "uhd",
     }
