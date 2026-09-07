@@ -7,12 +7,12 @@ PackageIdentifier: `wwb.BingWallpaper`
 ## 首次提交
 
 1. Fork `microsoft/winget-pkgs`。
-2. 将本仓库 `winget/manifests/w/wwb/BingWallpaper/0.2.0/` 下的三个文件复制到 fork 的对应目录：
-   `manifests/w/wwb/BingWallpaper/0.2.0/`
+2. 将本仓库 `winget/manifests/w/wwb/BingWallpaper/0.2.1/` 下的三个文件复制到 fork 的对应目录：
+   `manifests/w/wwb/BingWallpaper/0.2.1/`
 3. 在本地验证：
-   `winget validate --manifest manifests/w/wwb/BingWallpaper/0.2.0`
+   `winget validate --manifest manifests/w/wwb/BingWallpaper/0.2.1`
 4. 提交 PR，标题建议：
-   `New package: wwb.BingWallpaper version 0.2.0`
+   `New package: wwb.BingWallpaper version 0.2.1`
 
 ## 自动提交
 
