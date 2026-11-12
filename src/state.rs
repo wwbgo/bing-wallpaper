@@ -20,6 +20,8 @@ pub struct AppState {
     pub last_local_run_date: String,
     #[serde(default)]
     pub last_resolution: Option<String>,
+    #[serde(default)]
+    pub lock_screen_synced: bool,
 }
 
 impl AppState {
@@ -91,5 +93,34 @@ mod tests {
         .unwrap();
 
         assert_eq!(state.last_resolution, None);
+        assert!(!state.lock_screen_synced);
+    }
+
+    #[test]
+    fn previous_resolution_state_requires_lock_screen_migration() {
+        let state: AppState = serde_json::from_str(
+            r#"{"last_startdate":"20260903","last_image":"C:/img.jpg","copyright":"test","updated_at":"2026-09-03 09:00:00","last_local_run_date":"20260903","last_resolution":"uhd"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(state.last_resolution.as_deref(), Some("uhd"));
+        assert!(!state.lock_screen_synced);
+    }
+
+    #[test]
+    fn lock_screen_sync_status_survives_atomic_state_save() {
+        let dir = std::env::temp_dir().join(format!("bing-wallpaper-state-{}", std::process::id()));
+        let path = dir.join("state.json");
+        let mut state = AppState {
+            lock_screen_synced: true,
+            ..AppState::default()
+        };
+        state.save(&path).unwrap();
+        assert!(AppState::load(&path).unwrap().unwrap().lock_screen_synced);
+
+        state.lock_screen_synced = false;
+        state.save(&path).unwrap();
+        assert!(!AppState::load(&path).unwrap().unwrap().lock_screen_synced);
+        fs::remove_dir_all(dir).unwrap();
     }
 }

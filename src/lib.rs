@@ -16,7 +16,7 @@ use windows::Win32::Foundation::{CloseHandle, ERROR_ALREADY_EXISTS, GetLastError
 use windows::Win32::System::Threading::{CreateMutexW, ReleaseMutex};
 use windows::core::PCWSTR;
 
-use crate::cli::{Resolution, RunArgs, SetupArgs};
+use crate::cli::{Resolution, RunArgs, SetupArgs, WallpaperStyle};
 use crate::state::AppState;
 
 pub struct AppDirs {
@@ -74,7 +74,25 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
     dirs.ensure()?;
     let _guard = acquire_single_instance()?;
 
-    let state = load_state(&dirs.state_file).unwrap_or_default();
+    run_once_with(
+        &dirs,
+        args,
+        bing::fetch_today,
+        bing::download_image,
+        |path, style| {
+            wallpaper::set_wallpaper(path, style).and_then(|()| wallpaper::set_lock_screen(path))
+        },
+    )
+}
+
+fn run_once_with(
+    dirs: &AppDirs,
+    args: &RunArgs,
+    fetch: impl FnOnce(&str, &str) -> Result<bing::BingImage>,
+    download: impl FnOnce(&str, &bing::BingImage, Resolution, &Path) -> Result<()>,
+    apply: impl FnOnce(&Path, WallpaperStyle) -> Result<()>,
+) -> Result<RunOutcome> {
+    let mut state = load_state(&dirs.state_file).unwrap_or_default();
     let today = local_date_string();
     let wallpaper = &args.wallpaper;
     let resolution = effective_resolution(wallpaper.resolution)?;
@@ -82,9 +100,13 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
 
     if !args.force
         && !args.dry_run
-        && state.last_local_run_date == today
-        && Path::new(&state.last_image).is_file()
-        && state.last_resolution.as_deref() == Some(resolution_name)
+        && cached_state_is_current(
+            &state.last_local_run_date,
+            &today,
+            Path::new(&state.last_image).is_file(),
+            state.last_resolution.as_deref() == Some(resolution_name),
+            state.lock_screen_synced,
+        )
     {
         return Ok(RunOutcome {
             changed: false,
@@ -94,7 +116,7 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         });
     }
 
-    let image = bing::fetch_today(&wallpaper.host, &wallpaper.mkt)?;
+    let image = fetch(&wallpaper.host, &wallpaper.mkt)?;
     let image_path = dirs.images.join(format!("{}.jpg", image.startdate));
 
     if args.dry_run {
@@ -107,23 +129,52 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
     }
 
     let resolution_matches = state.last_resolution.as_deref() == Some(resolution_name);
-    if should_download_image(args.force, image_path.is_file(), resolution_matches) {
-        bing::download_image(&wallpaper.host, &image, resolution, &image_path)?;
+    let needs_download =
+        should_download_image(args.force, image_path.is_file(), resolution_matches);
+
+    // Persist uncertainty before replacing a cache file. If applying it fails, its
+    // previous resolution must never be used to validate the replacement.
+    state.lock_screen_synced = false;
+    if needs_download {
+        state.last_resolution = None;
     }
+    state.save(&dirs.state_file)?;
 
-    wallpaper::set_wallpaper(&image_path, wallpaper.style)?;
+    let update_result = (|| -> Result<()> {
+        if needs_download {
+            download(&wallpaper.host, &image, resolution, &image_path)?;
+        }
+        apply(&image_path, wallpaper.style)?;
 
-    let new_state = AppState {
-        last_startdate: image.startdate.clone(),
-        last_image: image_path.clone(),
-        copyright: image.copyright.clone(),
-        updated_at: local_timestamp(),
-        last_local_run_date: today,
-        last_resolution: Some(resolution_name.to_string()),
+        let new_state = AppState {
+            last_startdate: image.startdate.clone(),
+            last_image: image_path.clone(),
+            copyright: image.copyright.clone(),
+            updated_at: local_timestamp(),
+            last_local_run_date: today,
+            last_resolution: Some(resolution_name.to_string()),
+            lock_screen_synced: true,
+        };
+        new_state.save(&dirs.state_file)
+    })();
+
+    // Failed updates still prune the cache, but retain the last successful image
+    // as well as this attempt's image since either may still be used by Windows.
+    let previous_image = if update_result.is_err() {
+        state.last_image.as_path()
+    } else {
+        image_path.as_path()
     };
-    new_state.save(&dirs.state_file)?;
-
-    cleanup_images(&dirs.images, wallpaper.keep, &image_path)?;
+    let cleanup_result =
+        cleanup_images(&dirs.images, wallpaper.keep, &[&image_path, previous_image]);
+    if let Err(error) = update_result {
+        let _ = append_log_in(dirs, &format!("wallpaper update failed: {error:#}"));
+        if let Err(cleanup_error) = cleanup_result {
+            let _ = append_log_in(dirs, &format!("image cleanup failed: {cleanup_error:#}"));
+        }
+        return Err(error);
+    }
+    cleanup_result?;
 
     Ok(RunOutcome {
         changed: true,
@@ -131,6 +182,16 @@ pub fn run_once(args: &RunArgs) -> Result<RunOutcome> {
         image_path,
         copyright: image.copyright,
     })
+}
+
+fn cached_state_is_current(
+    last_local_run_date: &str,
+    today: &str,
+    image_exists: bool,
+    resolution_matches: bool,
+    lock_screen_synced: bool,
+) -> bool {
+    last_local_run_date == today && image_exists && resolution_matches && lock_screen_synced
 }
 
 fn effective_resolution(resolution: Resolution) -> Result<Resolution> {
@@ -226,6 +287,7 @@ pub fn status() -> Result<()> {
                 "resolution: {}",
                 state.last_resolution.as_deref().unwrap_or("unknown")
             );
+            println!("lock_screen_synced: {}", state.lock_screen_synced);
             println!("updated_at: {}", state.updated_at);
         }
         Ok(None) => println!("\n[state]\nnot created yet"),
@@ -237,6 +299,10 @@ pub fn status() -> Result<()> {
 
 pub fn append_log(message: &str) -> Result<()> {
     let dirs = AppDirs::new()?;
+    append_log_in(&dirs, message)
+}
+
+fn append_log_in(dirs: &AppDirs, message: &str) -> Result<()> {
     dirs.ensure()?;
 
     let log_path = dirs.logs.join("worker.log");
@@ -282,7 +348,7 @@ fn load_state(path: &Path) -> Result<AppState> {
     }
 }
 
-fn cleanup_images(dir: &Path, keep: usize, current: &Path) -> Result<()> {
+fn cleanup_images(dir: &Path, keep: usize, protected: &[&Path]) -> Result<()> {
     let keep = keep.max(1);
     let mut images = Vec::new();
 
@@ -300,7 +366,7 @@ fn cleanup_images(dir: &Path, keep: usize, current: &Path) -> Result<()> {
     images.reverse();
 
     for old in images.into_iter().skip(keep) {
-        if old != current {
+        if !protected.contains(&old.as_path()) {
             fs::remove_file(&old)
                 .with_context(|| format!("failed to remove old image {}", old.display()))?;
         }
@@ -351,12 +417,38 @@ fn local_now() -> OffsetDateTime {
 }
 
 #[cfg(test)]
+mod update_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn cached_state_is_not_current_until_lock_screen_is_synced() {
+        assert!(!cached_state_is_current(
+            "20260907", "20260907", true, true, false,
+        ));
+        assert!(cached_state_is_current(
+            "20260907", "20260907", true, true, true,
+        ));
+    }
+
+    #[test]
     fn force_downloads_cached_image_even_when_resolution_matches() {
         assert!(should_download_image(true, true, true));
+    }
+
+    #[test]
+    fn stale_or_missing_cached_image_requires_update() {
+        assert!(!cached_state_is_current(
+            "20260906", "20260907", true, true, true
+        ));
+        assert!(!cached_state_is_current(
+            "20260907", "20260907", false, true, true
+        ));
+        assert!(!cached_state_is_current(
+            "20260907", "20260907", true, false, true
+        ));
     }
 
     #[test]
